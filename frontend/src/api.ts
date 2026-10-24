@@ -42,6 +42,7 @@ export const api = {
   create: (payload: CreateOnboarding, mode: VerificationMode) =>
       request<Onboarding>(`/api/onboardings?mode=${mode}`, { method: 'POST', body: JSON.stringify(payload) }),
   get: (id: string) => request<Onboarding>(`/api/onboardings/${id}`),
+  list: () => request<Onboarding[]>('/api/onboardings?limit=50'),
   correct: (id: string, adminEmail: string, mode: VerificationMode) =>
       request<Onboarding>(`/api/onboardings/${id}/contact?mode=${mode}`, {
         method: 'PATCH', body: JSON.stringify({ adminEmail })

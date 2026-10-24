@@ -1,19 +1,20 @@
 package com.example.onboarding.onboarding.resource;
 
-import com.example.onboarding.onboarding.data.OnboardingResponse;
-import com.example.onboarding.onboarding.data.OnboardingStatus;
 import com.example.onboarding.onboarding.data.CreateOnboardingRequest;
+import com.example.onboarding.onboarding.data.OnboardingResponse;
 import com.example.onboarding.onboarding.data.UpdateContactRequest;
+
 import com.example.onboarding.onboarding.service.OnboardingService;
+import com.example.onboarding.onboarding.data.OnboardingStatus;
 import com.example.onboarding.verification.data.VerificationMode;
 import com.example.onboarding.verification.service.SyncFirstVerificationService;
 import jakarta.validation.Valid;
+import java.net.URI;
+import java.util.UUID;
+import java.util.List;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
-
-import java.net.URI;
-import java.util.UUID;
 
 @RestController
 @RequestMapping("/api/onboardings")
@@ -41,6 +42,11 @@ public class OnboardingController {
         return ResponseEntity.status(status)
                 .location(URI.create("/api/onboardings/" + result.id()))
                 .body(result);
+    }
+
+    @GetMapping
+    public List<OnboardingResponse> list(@RequestParam(defaultValue = "50") int limit) {
+        return service.listRecent(limit);
     }
 
     @GetMapping("/{id}")
