@@ -1,4 +1,4 @@
-package com.example.onboarding.onboarding.resource;
+package com.example.onboarding.onboarding.data;
 
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;

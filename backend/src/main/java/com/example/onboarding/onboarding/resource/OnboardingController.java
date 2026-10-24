@@ -1,9 +1,9 @@
 package com.example.onboarding.onboarding.resource;
 
+import com.example.onboarding.onboarding.data.OnboardingResponse;
 import com.example.onboarding.onboarding.data.OnboardingStatus;
-import com.example.onboarding.onboarding.resource.CreateOnboardingRequest;
-import com.example.onboarding.onboarding.resource.OnboardingResponse;
-import com.example.onboarding.onboarding.resource.UpdateContactRequest;
+import com.example.onboarding.onboarding.data.CreateOnboardingRequest;
+import com.example.onboarding.onboarding.data.UpdateContactRequest;
 import com.example.onboarding.onboarding.service.OnboardingService;
 import com.example.onboarding.verification.data.VerificationMode;
 import com.example.onboarding.verification.service.SyncFirstVerificationService;

@@ -1,7 +1,7 @@
 package com.example.onboarding.verification;
 
 import com.example.onboarding.verification.data.VerificationResult;
-import com.example.onboarding.verification.service.EmailVerifier;
+import com.example.onboarding.verification.data.EmailVerifier;
 import com.example.onboarding.verification.service.MockEmailVerifier;
 import org.junit.jupiter.api.Test;
 import static org.junit.jupiter.api.Assertions.assertEquals;

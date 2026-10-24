@@ -1,10 +1,10 @@
 package com.example.onboarding.verification;
 
 import com.example.onboarding.onboarding.data.OnboardingStatus;
-import com.example.onboarding.onboarding.resource.OnboardingResponse;
+import com.example.onboarding.onboarding.data.OnboardingResponse;
 import com.example.onboarding.onboarding.service.OnboardingService;
 import com.example.onboarding.verification.data.VerificationResult;
-import com.example.onboarding.verification.service.EmailVerifier;
+import com.example.onboarding.verification.data.EmailVerifier;
 import com.example.onboarding.verification.service.SyncFirstVerificationService;
 import com.example.onboarding.verification.service.VerificationJobManager;
 import org.junit.jupiter.api.Test;

@@ -2,9 +2,9 @@ package com.example.onboarding.api;
 
 
 import com.example.onboarding.onboarding.data.OnboardingStatus;
-import com.example.onboarding.onboarding.resource.CreateOnboardingRequest;
+import com.example.onboarding.onboarding.data.CreateOnboardingRequest;
 import com.example.onboarding.onboarding.resource.OnboardingController;
-import com.example.onboarding.onboarding.resource.OnboardingResponse;
+import com.example.onboarding.onboarding.data.OnboardingResponse;
 import com.example.onboarding.onboarding.service.OnboardingService;
 import com.example.onboarding.verification.data.VerificationMode;
 import com.example.onboarding.verification.service.SyncFirstVerificationService;

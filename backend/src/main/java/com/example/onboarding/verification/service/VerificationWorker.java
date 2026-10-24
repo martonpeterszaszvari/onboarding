@@ -1,5 +1,6 @@
 package com.example.onboarding.verification.service;
 
+import com.example.onboarding.verification.data.EmailVerifier;
 import com.example.onboarding.verification.data.VerificationResult;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;

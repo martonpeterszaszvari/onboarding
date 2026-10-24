@@ -1,7 +1,5 @@
-package com.example.onboarding.onboarding.resource;
+package com.example.onboarding.onboarding.data;
 
-import com.example.onboarding.onboarding.data.Onboarding;
-import com.example.onboarding.onboarding.data.OnboardingStatus;
 import java.time.Instant;
 import java.util.UUID;
 

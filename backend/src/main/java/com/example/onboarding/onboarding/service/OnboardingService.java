@@ -6,9 +6,9 @@ import java.util.UUID;
 
 import com.example.onboarding.onboarding.data.Onboarding;
 import com.example.onboarding.onboarding.repository.OnboardingRepository;
-import com.example.onboarding.onboarding.resource.CreateOnboardingRequest;
-import com.example.onboarding.onboarding.resource.OnboardingResponse;
-import com.example.onboarding.onboarding.resource.UpdateContactRequest;
+import com.example.onboarding.onboarding.data.CreateOnboardingRequest;
+import com.example.onboarding.onboarding.data.OnboardingResponse;
+import com.example.onboarding.onboarding.data.UpdateContactRequest;
 import com.example.onboarding.verification.data.VerificationJob;
 import com.example.onboarding.verification.data.VerificationMode;
 import com.example.onboarding.verification.repository.VerificationJobRepository;

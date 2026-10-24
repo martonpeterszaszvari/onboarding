@@ -1,6 +1,4 @@
-package com.example.onboarding.verification.service;
-
-import com.example.onboarding.verification.data.VerificationResult;
+package com.example.onboarding.verification.data;
 
 
 public interface EmailVerifier {

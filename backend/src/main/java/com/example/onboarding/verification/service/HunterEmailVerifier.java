@@ -5,7 +5,7 @@ import java.net.http.HttpClient;
 import java.time.Duration;
 
 import com.example.onboarding.verification.data.VerificationResult;
-import com.example.onboarding.verification.service.EmailVerifier;
+import com.example.onboarding.verification.data.EmailVerifier;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.http.ResponseEntity;
