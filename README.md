@@ -46,9 +46,9 @@ onboarding-starter/
 │   ├── pom.xml
 │   └── src/main/
 │       ├── java/com/example/onboarding/
-│       │   ├── api/                # Input validation, REST endpoints
-│       │   ├── domain/             # JPA state, persistence, service
-│       │   └── verification/       # Worker, durable claim, Hunter/mock boundary
+│       │       ├── onboarding/         # resource/, data/, service/, repository/
+│       │       ├── verification/       # resource/, data/, service/, repository/
+│       │       └── exception/          # API exception handling
 │       └── resources/db/migration/ # Flyway migrations
 ├── frontend/                       # React + TypeScript + Vite
 ├── compose.yml                     # PostgreSQL 16
