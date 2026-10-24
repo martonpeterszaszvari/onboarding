@@ -1,5 +1,6 @@
 package com.example.onboarding.verification.data;
 
+import com.example.onboarding.verification.data.JobStatus;
 import jakarta.persistence.*;
 import java.time.Instant;
 import java.util.UUID;
@@ -7,27 +8,36 @@ import java.util.UUID;
 @Entity
 @Table(name = "verification_jobs")
 public class VerificationJob {
+
     @Id
     private UUID id;
+
     @Column(nullable = false)
     private UUID onboardingId;
+
     @Column(nullable = false)
     private int revision;
+
     @Column(nullable = false)
     private String email;
+
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
     private JobStatus status;
+
     @Column(nullable = false)
     private int attemptCount;
+
     @Column(nullable = false)
     private Instant nextAttemptAt;
+
     private Instant leaseUntil;
     private UUID claimToken;
+
     @Column(nullable = false)
     private Instant createdAt;
 
-    protected VerificationJob() { }
+    protected VerificationJob() {}
 
     public VerificationJob(UUID onboardingId, int revision, String email) {
         this.id = UUID.randomUUID();
@@ -36,8 +46,12 @@ public class VerificationJob {
         this.email = email;
         this.status = JobStatus.PENDING;
         this.attemptCount = 0;
-        this.nextAttemptAt = Instant.now();
-        this.createdAt = nextAttemptAt;
+        this.createdAt = Instant.now();
+
+        // Grace period for synchronous verification.
+        // If the app crashes before the immediate attempt,
+        // the scheduled worker picks this up after 10 seconds.
+        this.nextAttemptAt = createdAt.plusSeconds(10);
     }
 
     public void reschedule(Instant dueAt) {
