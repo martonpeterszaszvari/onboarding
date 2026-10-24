@@ -1,8 +1,6 @@
 package com.example.onboarding.verification.data;
 
-
 import jakarta.persistence.*;
-
 import java.time.Instant;
 import java.util.UUID;
 

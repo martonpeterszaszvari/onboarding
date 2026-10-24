@@ -1,7 +1,8 @@
 package com.example.onboarding.verification.service;
 
-import com.example.onboarding.verification.data.VerificationResult;
 import com.example.onboarding.verification.data.EmailVerifier;
+import com.example.onboarding.verification.data.VerificationResult;
+
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
 
@@ -25,4 +26,3 @@ public class MockEmailVerifier implements EmailVerifier {
         return VerificationResult.valid();
     }
 }
-

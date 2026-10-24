@@ -10,6 +10,8 @@ import com.example.onboarding.onboarding.data.CreateOnboardingRequest;
 import com.example.onboarding.onboarding.data.OnboardingResponse;
 import com.example.onboarding.onboarding.data.UpdateContactRequest;
 import java.time.Instant;
+import com.example.onboarding.verification.data.VerificationWorkAvailable;
+import org.springframework.context.ApplicationEventPublisher;
 import java.util.Locale;
 import java.util.List;
 import org.springframework.data.domain.PageRequest;
@@ -23,23 +25,28 @@ import static org.springframework.http.HttpStatus.NOT_FOUND;
 public class OnboardingService {
     private final OnboardingRepository onboardings;
     private final VerificationJobRepository jobs;
+    private final ApplicationEventPublisher events;
 
-    public OnboardingService(OnboardingRepository onboardings, VerificationJobRepository jobs) {
+    public OnboardingService(OnboardingRepository onboardings, VerificationJobRepository jobs,
+                             ApplicationEventPublisher events) {
         this.onboardings = onboardings;
         this.jobs = jobs;
+        this.events = events;
     }
 
     @Transactional
     public OnboardingResponse create(CreateOnboardingRequest request, VerificationMode mode) {
         Onboarding onboarding = new Onboarding(
-                request.adminName().trim(), normalizeEmail(request.adminEmail()),
-                request.companyName().trim(), request.companyDomain().trim().toLowerCase(Locale.ROOT));
+            request.adminName().trim(), normalizeEmail(request.adminEmail()),
+            request.companyName().trim(), request.companyDomain().trim().toLowerCase(Locale.ROOT));
         onboardings.save(onboarding);
         // ASYNC jobs are due immediately. A SYNC job gets a short grace window,
         // allowing the HTTP request to claim it first. If the app crashes after
         // committing but before the first claim, the worker will pick it up.
         jobs.save(new VerificationJob(onboarding.getId(), onboarding.getRevision(),
-                onboarding.getAdminEmail(), firstAttemptAt(mode)));
+            onboarding.getAdminEmail(), firstAttemptAt(mode)));
+        // AFTER_COMMIT event only: never wake a worker for uncommitted data.
+        events.publishEvent(new VerificationWorkAvailable(onboarding.getId()));
         return OnboardingResponse.from(onboarding);
     }
 
@@ -49,22 +56,23 @@ public class OnboardingService {
     public List<OnboardingResponse> listRecent(int limit) {
         int safeLimit = Math.max(1, Math.min(limit, 100));
         return onboardings.findAllByOrderByCreatedAtDesc(PageRequest.of(0, safeLimit))
-                .stream().map(OnboardingResponse::from).toList();
+            .stream().map(OnboardingResponse::from).toList();
     }
 
     @Transactional(readOnly = true)
     public OnboardingResponse get(UUID id) {
         return OnboardingResponse.from(onboardings.findById(id)
-                .orElseThrow(() -> new ResponseStatusException(NOT_FOUND, "Onboarding not found")));
+            .orElseThrow(() -> new ResponseStatusException(NOT_FOUND, "Onboarding not found")));
     }
 
     @Transactional
     public OnboardingResponse updateContact(UUID id, UpdateContactRequest request, VerificationMode mode) {
         Onboarding onboarding = onboardings.findLockedById(id)
-                .orElseThrow(() -> new ResponseStatusException(NOT_FOUND, "Onboarding not found"));
+            .orElseThrow(() -> new ResponseStatusException(NOT_FOUND, "Onboarding not found"));
         onboarding.updateContact(normalizeEmail(request.adminEmail()));
         jobs.save(new VerificationJob(id, onboarding.getRevision(),
-                onboarding.getAdminEmail(), firstAttemptAt(mode)));
+            onboarding.getAdminEmail(), firstAttemptAt(mode)));
+        events.publishEvent(new VerificationWorkAvailable(onboarding.getId()));
         // Old jobs may finish after this point; their revision will be ignored.
         return OnboardingResponse.from(onboarding);
     }
@@ -72,8 +80,8 @@ public class OnboardingService {
     private static Instant firstAttemptAt(VerificationMode mode) {
         // Never rely on this grace period as the only durability mechanism.
         return mode == VerificationMode.SYNC
-                ? Instant.now().plusSeconds(10)
-                : Instant.now();
+            ? Instant.now().plusSeconds(10)
+            : Instant.now();
     }
 
     private static String normalizeEmail(String email) {

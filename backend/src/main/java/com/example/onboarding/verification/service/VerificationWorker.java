@@ -4,10 +4,9 @@ import com.example.onboarding.verification.data.EmailVerifier;
 import com.example.onboarding.verification.data.VerificationResult;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
-import java.util.UUID;
 
+/** Executes exactly one ALREADY CLAIMED job, on the dedicated worker pool. */
 @Component
 public class VerificationWorker {
     private static final Logger log = LoggerFactory.getLogger(VerificationWorker.class);
@@ -19,25 +18,18 @@ public class VerificationWorker {
         this.verifier = verifier;
     }
 
-    @Scheduled(fixedDelayString = "${app.worker.tick-ms:1000}")
-    public void processDueJobs() {
-        for (UUID jobId : jobManager.dueJobIds()) {
-            try {
-                VerificationJobManager.ClaimedJob claim = jobManager.claim(jobId);
-                if (claim == null) continue;
-                VerificationResult result;
-                try {
-                    result = verifier.verify(claim.email(), claim.attempt());
-                } catch (RuntimeException unexpected) {
-                    // Never log the API key or email in exception details.
-                    log.warn("Unexpected verifier exception: {}", unexpected.getClass().getSimpleName());
-                    result = VerificationResult.retryable("unexpected_error");
-                }
-                jobManager.complete(claim, result);
-            } catch (RuntimeException exception) {
-                // Leave claimed job leased; it will become eligible after lease expiry.
-                log.error("Job processing failed for jobId={}", jobId, exception);
-            }
+    public void processClaimed(VerificationJobManager.ClaimedJob claim) {
+        log.info("Background verification starting job={} attempt={}", claim.jobId(), claim.attempt());
+        VerificationResult result;
+        try {
+            result = verifier.verify(claim.email(), claim.attempt(), EmailVerifier.Mode.BACKGROUND);
+        } catch (RuntimeException exception) {
+            // Avoid logging email addresses, credentials, or provider URLs.
+            log.warn("Provider call raised {}", exception.getClass().getSimpleName());
+            result = VerificationResult.retryable("unexpected_error");
         }
+        // Must run outside a provider HTTP transaction; the manager opens a short DB transaction.
+        jobManager.complete(claim, result);
+        log.info("Background verification finished job={} outcome={}", claim.jobId(), result.kind());
     }
 }

@@ -1,19 +1,16 @@
-package com.example.onboarding.api;
-
-
-import com.example.onboarding.onboarding.data.OnboardingStatus;
-import com.example.onboarding.onboarding.data.CreateOnboardingRequest;
-import com.example.onboarding.onboarding.resource.OnboardingController;
+package com.example.onboarding.onboarding.resource;
 import com.example.onboarding.onboarding.data.OnboardingResponse;
+import com.example.onboarding.onboarding.data.CreateOnboardingRequest;
+
 import com.example.onboarding.onboarding.service.OnboardingService;
+import com.example.onboarding.onboarding.data.OnboardingStatus;
 import com.example.onboarding.verification.data.VerificationMode;
 import com.example.onboarding.verification.service.SyncFirstVerificationService;
-import org.junit.jupiter.api.Test;
-import org.springframework.http.HttpStatus;
-
 import java.time.Instant;
 import java.util.UUID;
-
+import java.util.List;
+import org.junit.jupiter.api.Test;
+import org.springframework.http.HttpStatus;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.Mockito.*;
 
@@ -23,6 +20,16 @@ class OnboardingControllerTest {
     private final OnboardingController controller = new OnboardingController(service, sync);
     private final CreateOnboardingRequest request =
         new CreateOnboardingRequest("Alex", "success@acme.com", "Acme", "acme.com");
+
+    @Test
+    void listReturnsPriorRegistrationsWithoutInvokingVerifier() {
+        OnboardingResponse first = response(OnboardingStatus.VERIFIED);
+        OnboardingResponse second = response(OnboardingStatus.REVIEW_REQUIRED);
+        when(service.listRecent(50)).thenReturn(List.of(first, second));
+
+        assertEquals(List.of(first, second), controller.list(50));
+        verifyNoInteractions(sync);
+    }
 
     @Test
     void asyncReturnsAcceptedWithoutCallingProviderInline() {

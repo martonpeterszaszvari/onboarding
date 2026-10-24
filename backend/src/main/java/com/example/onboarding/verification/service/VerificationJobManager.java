@@ -1,8 +1,6 @@
 package com.example.onboarding.verification.service;
 
-import java.time.Instant;
-import java.util.List;
-import java.util.UUID;
+import com.example.onboarding.verification.data.EmailVerifier;
 
 import com.example.onboarding.onboarding.data.Onboarding;
 import com.example.onboarding.onboarding.data.OnboardingStatus;
@@ -11,6 +9,9 @@ import com.example.onboarding.verification.data.JobStatus;
 import com.example.onboarding.verification.data.VerificationJob;
 import com.example.onboarding.verification.data.VerificationResult;
 import com.example.onboarding.verification.repository.VerificationJobRepository;
+import java.time.Instant;
+import java.util.List;
+import java.util.UUID;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
@@ -26,10 +27,10 @@ public class VerificationJobManager {
     private final int maxAttempts;
 
     public VerificationJobManager(VerificationJobRepository jobs, OnboardingRepository onboardings,
-                                  @Value("${app.worker.lease-seconds:60}") int leaseSeconds,
-                                  @Value("${app.worker.pending-delay-seconds:4}") int pendingDelaySeconds,
-                                  @Value("${app.worker.retry-base-seconds:2}") int retryBaseSeconds,
-                                  @Value("${app.worker.max-attempts:5}") int maxAttempts) {
+        @Value("${app.worker.lease-seconds:60}") int leaseSeconds,
+        @Value("${app.worker.pending-delay-seconds:4}") int pendingDelaySeconds,
+        @Value("${app.worker.retry-base-seconds:2}") int retryBaseSeconds,
+        @Value("${app.worker.max-attempts:5}") int maxAttempts) {
         this.jobs = jobs;
         this.onboardings = onboardings;
         this.leaseSeconds = leaseSeconds;
@@ -38,8 +39,20 @@ public class VerificationJobManager {
         this.maxAttempts = maxAttempts;
     }
 
-    public List<UUID> dueJobIds() {
-        return jobs.findDue(JobStatus.PENDING, JobStatus.PROCESSING, Instant.now(), PageRequest.of(0, 10));
+    public List<UUID> dueJobIds(int limit) {
+        return jobs.findDue(JobStatus.PENDING, JobStatus.PROCESSING,
+            Instant.now(), PageRequest.of(0, Math.max(1, limit)));
+    }
+
+    /** Next time a pending job becomes due, or a processing lease expires. */
+    @Transactional(readOnly = true)
+    public java.util.Optional<Instant> nextEligibleAt() {
+        var pending = jobs.earliestPending(JobStatus.PENDING);
+        var processing = jobs.earliestProcessingLease(JobStatus.PROCESSING);
+        if (pending.isEmpty()) return processing;
+        if (processing.isEmpty()) return pending;
+        return java.util.Optional.of(pending.get().isBefore(processing.get())
+            ? pending.get() : processing.get());
     }
 
     public record ClaimedJob(UUID jobId, UUID token, String email, int attempt) { }
@@ -48,10 +61,10 @@ public class VerificationJobManager {
     @Transactional
     public ClaimedJob claimInitial(UUID onboardingId, int revision) {
         VerificationJob job = jobs.findByOnboardingIdAndRevision(onboardingId, revision)
-                .orElseThrow();
+            .orElseThrow();
         UUID token = UUID.randomUUID();
         int claimed = jobs.claimInitial(job.getId(), JobStatus.PENDING,
-                JobStatus.PROCESSING, token, Instant.now().plusSeconds(leaseSeconds));
+            JobStatus.PROCESSING, token, Instant.now().plusSeconds(leaseSeconds));
         return claimed == 0 ? null : prepareClaim(job.getId(), token);
     }
 
@@ -61,7 +74,7 @@ public class VerificationJobManager {
         Instant now = Instant.now();
         UUID token = UUID.randomUUID();
         int claimed = jobs.claim(id, JobStatus.PENDING, JobStatus.PROCESSING, token,
-                now, now.plusSeconds(leaseSeconds));
+            now, now.plusSeconds(leaseSeconds));
         return claimed == 0 ? null : prepareClaim(id, token);
     }
 
@@ -78,7 +91,7 @@ public class VerificationJobManager {
 
     @Transactional
     public void complete(ClaimedJob claim, VerificationResult result) {
-        VerificationJob job = jobs.findById(claim.jobId()).orElseThrow();
+        VerificationJob job = jobs.findLockedById(claim.jobId()).orElseThrow();
         if (job.getStatus() != JobStatus.PROCESSING || !claim.token().equals(job.getClaimToken())) {
             return; // An expired lease may have been claimed by another worker.
         }
@@ -108,14 +121,17 @@ public class VerificationJobManager {
                 if (job.getAttemptCount() >= maxAttempts) {
                     job.finish();
                     onboarding.setVerification(OnboardingStatus.REVIEW_REQUIRED,
-                            result.providerStatus(), "Automatic retries exhausted. Additional review is required.");
+                        result.providerStatus(), "Automatic retries exhausted. Additional review is required.");
                 } else {
-                    long delay = result.kind() == VerificationResult.Kind.PENDING
-                            ? pendingDelaySeconds
-                            : Math.min(60, (long) retryBaseSeconds * (1L << Math.min(job.getAttemptCount() - 1, 5)));
+                    boolean stillProcessing = result.kind() == VerificationResult.Kind.PENDING
+                        || "network_timeout".equals(result.providerStatus())
+                        || "sync_timeout".equals(result.providerStatus());
+                    long delay = stillProcessing
+                        ? pendingDelaySeconds
+                        : Math.min(60, (long) retryBaseSeconds * (1L << Math.min(job.getAttemptCount() - 1, 5)));
                     job.reschedule(Instant.now().plusSeconds(delay));
                     onboarding.setVerification(OnboardingStatus.VERIFYING,
-                            result.providerStatus(), result.message());
+                        result.providerStatus(), result.message());
                 }
             }
         }

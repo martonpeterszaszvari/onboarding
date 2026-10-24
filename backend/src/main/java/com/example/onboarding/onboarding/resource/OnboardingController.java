@@ -29,19 +29,19 @@ public class OnboardingController {
 
     @PostMapping
     public ResponseEntity<OnboardingResponse> create(
-            @Valid @RequestBody CreateOnboardingRequest request,
-            @RequestParam(defaultValue = "ASYNC") VerificationMode mode) {
+        @Valid @RequestBody CreateOnboardingRequest request,
+        @RequestParam(defaultValue = "ASYNC") VerificationMode mode) {
 
         // Both modes persist onboarding + job atomically, then commit.
         OnboardingResponse saved = service.create(request, mode);
         // ASYNC does not call Hunter during this request at all.
         OnboardingResponse result = mode == VerificationMode.SYNC
-                ? syncVerifier.attempt(saved) : saved;
+            ? syncVerifier.attempt(saved) : saved;
 
         HttpStatus status = isProcessing(result) ? HttpStatus.ACCEPTED : HttpStatus.CREATED;
         return ResponseEntity.status(status)
-                .location(URI.create("/api/onboardings/" + result.id()))
-                .body(result);
+            .location(URI.create("/api/onboardings/" + result.id()))
+            .body(result);
     }
 
     @GetMapping
@@ -56,19 +56,19 @@ public class OnboardingController {
 
     @PatchMapping("/{id}/contact")
     public ResponseEntity<OnboardingResponse> updateContact(
-            @PathVariable UUID id,
-            @Valid @RequestBody UpdateContactRequest request,
-            @RequestParam(defaultValue = "ASYNC") VerificationMode mode) {
+        @PathVariable UUID id,
+        @Valid @RequestBody UpdateContactRequest request,
+        @RequestParam(defaultValue = "ASYNC") VerificationMode mode) {
 
         OnboardingResponse saved = service.updateContact(id, request, mode);
         OnboardingResponse result = mode == VerificationMode.SYNC
-                ? syncVerifier.attempt(saved) : saved;
+            ? syncVerifier.attempt(saved) : saved;
         return ResponseEntity.status(isProcessing(result) ? HttpStatus.ACCEPTED : HttpStatus.OK)
-                .body(result);
+            .body(result);
     }
 
     private static boolean isProcessing(OnboardingResponse response) {
         return response.status() == OnboardingStatus.PENDING
-                || response.status() == OnboardingStatus.VERIFYING;
+            || response.status() == OnboardingStatus.VERIFYING;
     }
 }

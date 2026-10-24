@@ -1,17 +1,13 @@
-package com.example.onboarding.verification;
-
-import com.example.onboarding.onboarding.data.OnboardingStatus;
-import com.example.onboarding.onboarding.data.OnboardingResponse;
-import com.example.onboarding.onboarding.service.OnboardingService;
+package com.example.onboarding.verification.service;
 import com.example.onboarding.verification.data.VerificationResult;
 import com.example.onboarding.verification.data.EmailVerifier;
-import com.example.onboarding.verification.service.SyncFirstVerificationService;
-import com.example.onboarding.verification.service.VerificationJobManager;
-import org.junit.jupiter.api.Test;
 
+import com.example.onboarding.onboarding.data.OnboardingResponse;
+import com.example.onboarding.onboarding.service.OnboardingService;
+import com.example.onboarding.onboarding.data.OnboardingStatus;
 import java.time.Instant;
 import java.util.UUID;
-
+import org.junit.jupiter.api.Test;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.Mockito.*;
 
@@ -22,7 +18,7 @@ class SyncFirstVerificationServiceTest {
         OnboardingService onboardings = mock(OnboardingService.class);
         VerificationJobManager jobs = mock(VerificationJobManager.class);
         EmailVerifier verifier = mock(EmailVerifier.class);
-        SyncFirstVerificationService service = new SyncFirstVerificationService(onboardings, jobs, verifier);
+        SyncFirstVerificationService service = new SyncFirstVerificationService(onboardings, jobs, verifier, mock(VerificationScheduler.class));
         UUID id = UUID.randomUUID();
         UUID jobId = UUID.randomUUID();
         UUID token = UUID.randomUUID();
@@ -46,7 +42,7 @@ class SyncFirstVerificationServiceTest {
         OnboardingService onboardings = mock(OnboardingService.class);
         VerificationJobManager jobs = mock(VerificationJobManager.class);
         EmailVerifier verifier = mock(EmailVerifier.class);
-        SyncFirstVerificationService service = new SyncFirstVerificationService(onboardings, jobs, verifier);
+        SyncFirstVerificationService service = new SyncFirstVerificationService(onboardings, jobs, verifier, mock(VerificationScheduler.class));
         UUID id = UUID.randomUUID();
         VerificationJobManager.ClaimedJob claim = new VerificationJobManager.ClaimedJob(
             UUID.randomUUID(), UUID.randomUUID(), "slow@acme.com", 1);

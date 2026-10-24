@@ -1,17 +1,18 @@
 package com.example.onboarding.verification.service;
 
+import com.example.onboarding.verification.data.EmailVerifier;
+import com.example.onboarding.verification.data.VerificationResult;
 
 import java.net.http.HttpClient;
 import java.time.Duration;
-
-import com.example.onboarding.verification.data.VerificationResult;
-import com.example.onboarding.verification.data.EmailVerifier;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.client.JdkClientHttpRequestFactory;
 import org.springframework.stereotype.Component;
-import org.springframework.web.client.*;
+import org.springframework.web.client.ResourceAccessException;
+import org.springframework.web.client.RestClient;
+import org.springframework.web.client.RestClientResponseException;
 
 /** Optional real integration. Activate with HUNTER_MODE=real and HUNTER_API_KEY=... */
 @Component
@@ -22,7 +23,7 @@ public class HunterEmailVerifier implements EmailVerifier {
     private final String apiKey;
 
     public HunterEmailVerifier(@Value("${hunter.api-key:}") String apiKey,
-                               @Value("${hunter.fast-timeout-ms:2000}") int fastTimeoutMs) {
+        @Value("${hunter.fast-timeout-ms:2000}") int fastTimeoutMs) {
         if (apiKey.isBlank()) throw new IllegalStateException("HUNTER_API_KEY is required in real mode");
         this.apiKey = apiKey;
         this.fastClient = createClient(Duration.ofMillis(fastTimeoutMs));
@@ -47,9 +48,9 @@ public class HunterEmailVerifier implements EmailVerifier {
         RestClient client = mode == Mode.FAST ? fastClient : backgroundClient;
         try {
             ResponseEntity<HunterResponse> response = client.get()
-                    .uri(builder -> builder.path("/v2/email-verifier")
-                            .queryParam("email", email).queryParam("api_key", apiKey).build())
-                    .retrieve().toEntity(HunterResponse.class);
+                .uri(builder -> builder.path("/v2/email-verifier")
+                    .queryParam("email", email).queryParam("api_key", apiKey).build())
+                .retrieve().toEntity(HunterResponse.class);
             int http = response.getStatusCode().value();
             if (http == 202) return VerificationResult.pending();
             if (http == 222) return VerificationResult.retryable("smtp_error");
@@ -73,7 +74,7 @@ public class HunterEmailVerifier implements EmailVerifier {
                 case 401 -> VerificationResult.unavailable("authentication_failed");
                 case 451 -> VerificationResult.inconclusive("privacy_restricted");
                 default -> http >= 500 ? VerificationResult.retryable("hunter_5xx")
-                        : VerificationResult.unavailable("hunter_http_" + http);
+                    : VerificationResult.unavailable("hunter_http_" + http);
             };
         } catch (ResourceAccessException exception) {
             return VerificationResult.retryable("network_timeout");

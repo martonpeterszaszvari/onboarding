@@ -1,6 +1,5 @@
 package com.example.onboarding.verification.data;
 
-
 public interface EmailVerifier {
     enum Mode { FAST, BACKGROUND }
 
@@ -10,4 +9,3 @@ public interface EmailVerifier {
         return verify(email, attempt, Mode.BACKGROUND);
     }
 }
-
