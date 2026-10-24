@@ -1,11 +1,21 @@
-package com.example.onboarding.verification.service;
+package com.example.onboarding.verification;
 
 import com.example.onboarding.verification.data.VerificationResult;
+import com.example.onboarding.verification.service.EmailVerifier;
+import com.example.onboarding.verification.service.MockEmailVerifier;
 import org.junit.jupiter.api.Test;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
 class MockEmailVerifierTest {
     private final MockEmailVerifier verifier = new MockEmailVerifier();
+
+    @Test
+    void fastTimeoutSucceedsInBackground() {
+        assertEquals(VerificationResult.Kind.RETRYABLE,
+            verifier.verify("slow@acme.com", 1, EmailVerifier.Mode.FAST).kind());
+        assertEquals(VerificationResult.Kind.DELIVERABLE,
+            verifier.verify("slow@acme.com", 2, EmailVerifier.Mode.BACKGROUND).kind());
+    }
 
     @Test
     void delayedThenSucceeds() {
@@ -18,6 +28,14 @@ class MockEmailVerifierTest {
     void transientFailureThenSucceeds() {
         assertEquals(VerificationResult.Kind.RETRYABLE, verifier.verify("flaky@acme.com", 1).kind());
         assertEquals(VerificationResult.Kind.DELIVERABLE, verifier.verify("flaky@acme.com", 3).kind());
+    }
+
+    @Test
+    void retryExhaustionScenarioNeverSucceeds() {
+        for (int attempt = 1; attempt <= 5; attempt++) {
+            assertEquals(VerificationResult.Kind.RETRYABLE,
+                verifier.verify("exhaust@acme.com", attempt).kind());
+        }
     }
 
     @Test

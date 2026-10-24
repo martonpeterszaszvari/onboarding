@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useState, type FormEvent } from 'react';
-import { api, type CreateOnboarding, type Onboarding, type OnboardingStatus } from './api';
+import { api, type CreateOnboarding, type Onboarding, type OnboardingStatus, type VerificationMode } from './api';
 
 const STORAGE_KEY = 'onboarding-demo-id';
+const MODE_KEY = 'onboarding-demo-mode';
 const INITIAL: CreateOnboarding = {
   adminName: 'Alex Smith',
   adminEmail: 'delay@acme.com',
@@ -11,6 +12,7 @@ const INITIAL: CreateOnboarding = {
 const IS_PROCESSING = (status: OnboardingStatus) => status === 'PENDING' || status === 'VERIFYING';
 
 const SCENARIOS = [
+  { label: 'Fast timeout', email: 'slow@acme.com', note: 'sync → async fallback' },
   { label: 'Instant success', email: 'success@acme.com', note: 'valid' },
   { label: 'Delayed (202)', email: 'delay@acme.com', note: 'pending → success' },
   { label: 'Transient error', email: 'flaky@acme.com', note: '503 → retry' },
@@ -31,6 +33,8 @@ const STATUS_LABELS: Record<OnboardingStatus, string> = {
 
 export default function App() {
   const [form, setForm] = useState<CreateOnboarding>(INITIAL);
+  const [mode, setMode] = useState<VerificationMode>(() =>
+      localStorage.getItem(MODE_KEY) === 'ASYNC' ? 'ASYNC' : 'SYNC');
   const [onboardingId, setOnboardingId] = useState<string | null>(() => localStorage.getItem(STORAGE_KEY));
   const [current, setCurrent] = useState<Onboarding | null>(null);
   const [contactEmail, setContactEmail] = useState('');
@@ -66,8 +70,9 @@ export default function App() {
     setBusy(true);
     setError(null);
     try {
-      const record = await api.create(form);
+      const record = await api.create(form, mode);
       localStorage.setItem(STORAGE_KEY, record.id);
+      localStorage.setItem(MODE_KEY, mode);
       setCurrent(record);
       setContactEmail(record.adminEmail);
       setOnboardingId(record.id);
@@ -84,7 +89,7 @@ export default function App() {
     setBusy(true);
     setError(null);
     try {
-      const record = await api.correct(current.id, contactEmail);
+      const record = await api.correct(current.id, contactEmail, mode);
       setCurrent(record);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Unable to update contact');
@@ -114,13 +119,13 @@ export default function App() {
           <aside className="sidebar">
             <span className="eyebrow">A BACKEND ENGINEERING EXERCISE</span>
             <h1>Onboard your business.<br /><em>Verify with confidence.</em></h1>
-            <p>Register a company, then follow a durable background job while an external email verifier finishes its work.</p>
+            <p>Choose a quick verification attempt or queue it immediately. Both paths keep unfinished checks durable in PostgreSQL.</p>
             <ol className="step-list">
               <li className="step active-step"><span className="step-number">01</span><span><strong>Company details</strong><small>Collect admin and business information</small></span></li>
-              <li className={`step ${current ? 'active-step' : ''}`}><span className="step-number">02</span><span><strong>Contact verification</strong><small>Asynchronous Hunter API integration</small></span></li>
+              <li className={`step ${current ? 'active-step' : ''}`}><span className="step-number">02</span><span><strong>Contact verification</strong><small>Synchronous-first or queued processing</small></span></li>
               <li className={`step ${success ? 'active-step' : ''}`}><span className="step-number">03</span><span><strong>Continue onboarding</strong><small>Not in scope for this prototype</small></span></li>
             </ol>
-            <div className="tech-note"><span>WHY ASYNC?</span><p>A provider may respond with HTTP 202, time out, or rate limit requests. Verification state is stored in PostgreSQL, not in React or application memory.</p></div>
+            <div className="tech-note"><span>TWO EXECUTION MODES</span><p>Sync first: call Hunter on the request thread, then fall back if unfinished. Async: return as soon as the database job is committed. Both use the same worker for retries.</p></div>
           </aside>
           <section className="panel" aria-live="polite">
             {loading && !current ? (
@@ -133,8 +138,19 @@ export default function App() {
                     <label>Admin business email<input required type="email" maxLength={255} value={form.adminEmail} onChange={e => setForm({ ...form, adminEmail: e.target.value })} /></label>
                     <label>Company name<input required maxLength={160} value={form.companyName} onChange={e => setForm({ ...form, companyName: e.target.value })} /></label>
                     <label>Company domain<input required placeholder="acme.com" maxLength={255} value={form.companyDomain} onChange={e => setForm({ ...form, companyDomain: e.target.value })} /></label>
+                    <fieldset className="mode-selector" disabled={busy}>
+                      <legend>How should verification run?</legend>
+                      <label className={`mode-option ${mode === 'SYNC' ? 'selected' : ''}`}>
+                        <input type="radio" name="verification-mode" checked={mode === 'SYNC'} onChange={() => setMode('SYNC')} />
+                        <span><strong>Sync first</strong><small>Try Hunter now (short timeout). Unfinished checks move to the background.</small></span>
+                      </label>
+                      <label className={`mode-option ${mode === 'ASYNC' ? 'selected' : ''}`}>
+                        <input type="radio" name="verification-mode" checked={mode === 'ASYNC'} onChange={() => setMode('ASYNC')} />
+                        <span><strong>Async</strong><small>Save a job and return immediately; the worker calls Hunter later.</small></span>
+                      </label>
+                    </fieldset>
                     {error && <p className="error" role="alert">{error}</p>}
-                    <button className="primary" disabled={busy}>{busy ? 'Submitting…' : 'Register and verify →'}</button>
+                    <button className="primary" disabled={busy}>{busy ? (mode === 'SYNC' ? 'Checking Hunter…' : 'Queuing…') : mode === 'SYNC' ? 'Register & verify now →' : 'Register & queue verification →'}</button>
                   </form>
                   <div className="scenario-box"><span className="eyebrow">MOCK INTEGRATION · CHOOSE A TEST CASE</span><div className="scenario-grid">
                     {SCENARIOS.map(item => <button key={item.email} type="button" className={`scenario ${form.adminEmail === item.email ? 'selected' : ''}`} onClick={() => setForm({ ...form, adminEmail: item.email })}><strong>{item.label}</strong><small>{item.note}</small></button>)}
@@ -142,13 +158,14 @@ export default function App() {
                 </>
             ) : (
                 <>
-                  <div className="panel-heading"><span className="eyebrow">STEP 02 / 02</span><h2>Contact verification</h2><p>Your application has been accepted. You can refresh or return later without losing progress.</p></div>
+                  <div className="panel-heading"><span className="eyebrow">STEP 02 / 02</span><h2>Contact verification</h2><p>{mode === 'SYNC' ? 'Sync first was selected: completed checks returned immediately; unfinished ones continue as jobs.' : 'Async was selected: the background worker handles verification.'} You can return later without losing progress.</p></div>
                   <div className={`outcome ${success ? 'success' : active ? 'working' : 'attention'}`}>
                     <div className="outcome-header"><span className="outcome-icon">{success ? '✓' : active ? '↻' : '!'}</span><div><span className="eyebrow">CURRENT STATUS</span><h3>{STATUS_LABELS[current.status]}</h3></div></div>
                     <p>{current.statusMessage}</p>
                     {active && <div className="activity"><span className="spinner" /> Polling status every 2.5 seconds</div>}
                   </div>
                   <dl className="details">
+                    <div><dt>Requested mode</dt><dd>{mode === 'SYNC' ? 'Sync first (with fallback)' : 'Async (queued)'}</dd></div>
                     <div><dt>Company</dt><dd>{current.companyName}</dd></div>
                     <div><dt>Business domain</dt><dd>{current.companyDomain}</dd></div>
                     <div><dt>Email</dt><dd>{current.adminEmail}</dd></div>
@@ -158,7 +175,7 @@ export default function App() {
                   </dl>
                   {pollError && <p className="error" role="alert">Could not refresh: {pollError}. Your data is still stored on the server.</p>}
                   {error && <p className="error" role="alert">{error}</p>}
-                  {!active && !success && <form className="correction" onSubmit={correctContact}><label>Update contact email / retry<input type="email" required value={contactEmail} onChange={e => setContactEmail(e.target.value)} /></label><button className="primary" disabled={busy}>{busy ? 'Updating…' : 'Submit new check →'}</button></form>}
+                  {!active && !success && <form className="correction" onSubmit={correctContact}><label>Update contact email / retry<input type="email" required value={contactEmail} onChange={e => setContactEmail(e.target.value)} /></label><label className="correction-mode">Retry mode<select value={mode} onChange={e => { const next = e.target.value as VerificationMode; setMode(next); localStorage.setItem(MODE_KEY, next); }}><option value="SYNC">Sync first (fallback to async)</option><option value="ASYNC">Async only</option></select></label><button className="primary" disabled={busy}>{busy ? 'Updating…' : 'Submit new check →'}</button></form>}
                   {success && <p className="safe-note">✓ Contact deliverability check passed. This is <strong>not</strong> identity, email ownership, or business-authority verification.</p>}
                   <div className="bottom-actions"><button className="text-button" onClick={() => void refresh(current.id)}>Refresh now</button><button className="text-button" onClick={reset}>Start a new onboarding ↗</button></div>
                 </>
