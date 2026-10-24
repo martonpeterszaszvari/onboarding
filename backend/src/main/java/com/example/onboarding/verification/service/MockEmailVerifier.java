@@ -34,7 +34,9 @@ public class MockEmailVerifier implements EmailVerifier {
         if (username.startsWith("quota")) {
             return VerificationResult.unavailable("quota_exceeded");
         }
-
+        if (username.startsWith("exhaust")) {
+            return VerificationResult.retryable("simulated_timeout");
+        }
         // Simulates a synchronous request exceeding
         // its timeout, but succeeding in the background.
         if (username.startsWith("slow")) {
