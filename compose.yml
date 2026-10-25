@@ -1,19 +1,65 @@
 services:
   postgres:
     image: postgres:16-alpine
+    restart: unless-stopped
     environment:
-      POSTGRES_DB: onboarding
-      POSTGRES_USER: onboarding
-      POSTGRES_PASSWORD: onboarding
+      POSTGRES_DB: ${POSTGRES_DB:-onboarding}
+      POSTGRES_USER: ${POSTGRES_USER:-onboarding}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-onboarding}
     ports:
-      - "5432:5432"
+      # DBeaver can still use localhost:5432 (local machine only).
+      - "127.0.0.1:${POSTGRES_PORT:-5432}:5432"
     volumes:
       - onboarding_pgdata:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U onboarding -d onboarding"]
-      interval: 3s
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
       timeout: 3s
-      retries: 10
+      retries: 12
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    environment:
+      DB_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB:-onboarding}
+      DB_USER: ${POSTGRES_USER:-onboarding}
+      DB_PASSWORD: ${POSTGRES_PASSWORD:-onboarding}
+      HUNTER_MODE: ${HUNTER_MODE:-mock}
+      HUNTER_API_KEY: ${HUNTER_API_KEY:-}
+      HUNTER_FAST_TIMEOUT_MS: ${HUNTER_FAST_TIMEOUT_MS:-2000}
+      PENDING_DELAY_SECONDS: ${PENDING_DELAY_SECONDS:-4}
+      RETRY_BASE_SECONDS: ${RETRY_BASE_SECONDS:-2}
+      WORKER_CONCURRENCY: ${WORKER_CONCURRENCY:-3}
+    ports:
+      - "127.0.0.1:${BACKEND_PORT:-8080}:8080"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O /dev/null http://127.0.0.1:8080/actuator/health"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+      start_period: 20s
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:${FRONTEND_PORT:-5173}:80"
+    depends_on:
+      backend:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O /dev/null http://127.0.0.1/"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
 
 volumes:
+  # Existing volume is retained across 'docker compose down' (without -v).
   onboarding_pgdata:
