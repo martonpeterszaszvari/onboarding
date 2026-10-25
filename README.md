@@ -1,8 +1,38 @@
 # Business Onboarding — Setup and Run
-
 This project is a self-service business onboarding prototype. A company administrator can enter their contact and company information, then check the deliverability of their email address using Hunter.io or a mock verification provider. The application displays the verification outcome and keeps a history of previous submissions.
 
-Users can choose synchronous-first verification for an immediate result when possible, or asynchronous verification to submit new requests while earlier ones are still processing. The Spring Boot backend stores verification jobs in PostgreSQL and processes unfinished work in the background, with retries and recovery after application restarts. The React frontend provides the registration form and status views.
+Users can choose synchronous-first verification for an immediate result when possible, or asynchronous verification to submit new requests while earlier ones are still processing.
+
+The Spring Boot backend stores verification jobs in PostgreSQL and uses an on-demand scheduler with a managed thread pool of up to three concurrent workers to process asynchronous requests. Jobs are executed in background threads without blocking incoming HTTP requests. The system supports retries, bounded concurrency, and recovery of unfinished jobs after application restarts.
+
+When no verification jobs require processing, the scheduler remains idle until new work arrives or a retry becomes due. The React frontend provides the registration form, verification status views, and submission history.
+## Repository layout
+
+```text
+onboarding-on-demand/
+├── backend/                        # Spring Boot 4 + Java 21 + Maven
+│   ├── pom.xml
+│   └── src/main/
+│       ├── java/com/example/onboarding/
+│       │   ├── exception/          # API error mapping
+│       │   ├── onboarding/
+│       │   │   ├── data/           # DTOs, statuses
+│       │   │   ├── entity/         # entity 
+│       │   │   ├── repository/     # JPA persistence
+│       │   │   ├── resource/       # REST controller
+│       │   │   └── service/        # Onboarding transactions
+│       │   └── verification/
+│       │       ├── data/           # Verifier interface, jobs and result types
+│       │       ├── entity/         # entity 
+│       │       ├── repository/     # Durable job claims
+│       │       ├── config/         # Managed worker pool and one-shot timer
+│       │       ├── verifier/       # Hunter/mock adapters
+│       │       └── service/        # dispatcher, worker
+│       └── resources/db/migration/ # Flyway migrations
+├── frontend/                       # React + TypeScript + Vite
+├── compose.yml                     # PostgreSQL + backend + frontend
+└── README.md
+```
 
 ## Requirements
 
@@ -143,3 +173,5 @@ docker compose up -d --force-recreate backend
 For a **locally running backend**, set `HUNTER_MODE=real`, `HUNTER_API_KEY`, and `PENDING_DELAY_SECONDS=60` in the environment of the Spring Boot process (or in your IDE run configuration) before starting it. The root `.env` file is read by Docker Compose, **not automatically by Spring Boot**.
 
 Do not commit the `.env` file or your API key to source control.
+
+
