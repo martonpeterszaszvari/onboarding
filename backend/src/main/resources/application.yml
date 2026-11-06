@@ -21,6 +21,7 @@ management:
 hunter:
   mode: ${HUNTER_MODE:mock}
   api-key: ${HUNTER_API_KEY:}
+  fast-timeout-ms: ${HUNTER_FAST_TIMEOUT_MS:2000}
 app:
   worker:
     tick-ms: ${WORKER_TICK_MS:1000}
